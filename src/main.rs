@@ -5,6 +5,8 @@ mod netpong;
 use ball::Ball;
 use player::Player;
 
+use std::time::Duration;
+
 use ggez::input::mouse;
 use ggez::{
     event, 
@@ -43,6 +45,7 @@ impl MainState {
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut Context) -> GameResult {
         let dt = ggez::timer::delta(ctx).as_secs_f32();
+        ggez::timer::sleep(Duration::from_secs_f32((0.016666 - dt).max(0.0)));
 
         if dt < 0.1 {
             self.p1.is_active =  self.ball.is_going_left();
@@ -82,13 +85,6 @@ impl event::EventHandler for MainState {
 }
 
 fn main() -> GameResult {
-    // let cb = ggez::ContextBuilder::new("netpong", "ahenshaw");
-    // let wm = conf::WindowMode {
-    //     resizable: true, 
-    //     maximized: true,
-    //     fullscreen_type: conf::FullscreenType::Windowed,
-    //     ..Default::default()
-    // };
     let (mut ctx, event_loop) = ContextBuilder::new("netpong", "ahenshaw")
             .window_mode(
                 conf::WindowMode::default()
@@ -102,7 +98,7 @@ fn main() -> GameResult {
 
     graphics::set_window_title(&ctx, "Net Pong");
     let state = MainState::new(&mut ctx);
-    // mouse::set_cursor_grabbed(&mut ctx, true)?;
+    mouse::set_cursor_grabbed(&mut ctx, true)?;
     mouse::set_cursor_hidden(&mut ctx, true);
     event::run(ctx, event_loop, state)
 }
