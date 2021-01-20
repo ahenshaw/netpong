@@ -88,9 +88,9 @@ impl Player {
     }
 
     pub fn check_for_hit(&mut self, ball: &mut Ball, ctx: &mut Context) { 
-        // if self.is_left {
+        if self.is_left {
             self.pos.y = ball.pos.y;
-        // }
+        }
 
         if let Some(prev) = &self.last_ball {
 
@@ -109,9 +109,9 @@ impl Player {
                 let frac = (edge - prev.x)/dx;
                 let y    = prev.y + dy * frac;
 
-                // if self.is_left {
+                if self.is_left {
                     self.pos.y  = y; // demo mode
-                // }
+                }
                 let top    = self.pos.y + self.height/2.0;
                 let bottom = self.pos.y - self.height/2.0;
     
