@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package  netpong;
+
+message Paddle {
+    float y = 1;
+}
+
+message Ball {
+    float x = 1;
+    float y = 2;
+    float vx = 3;
+    float vy = 4;
+}
+
+message Update {
+    oneof UpdateType {
+        Paddle paddle = 1;
+        Ball   ball   = 2;
+    }
+}

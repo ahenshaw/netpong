@@ -1,0 +1,18 @@
+[package]
+name = "netpong"
+version = "0.1.0"
+authors = ["ahenshaw"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+#ggez = "0.6.0-rc0"
+
+[dependencies]
+rand = "0.7.3"
+quick-protobuf = "0.8.0"
+ggez = {git = "https://github.com/ggez/ggez.git", branch = "devel"}
+structopt = "0.3.21"
+
+
+[profile.release]
+opt-level = 'z'  # Optimize for size
