@@ -6,6 +6,8 @@ use ball::Ball;
 use player::{Player, PlayerType};
 use structopt::StructOpt;
 
+use std::time::Duration;
+
 use ggez::input::mouse;
 use ggez::{
     event, 
@@ -105,6 +107,7 @@ impl event::EventHandler for MainState {
         };
 
         let dt = ggez::timer::delta(ctx).as_secs_f32();
+        ggez::timer::sleep(Duration::from_secs_f32((0.016666 - dt).max(0.0)));
 
         if dt < 0.1 {
             self.p1.update(ctx);
