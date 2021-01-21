@@ -52,10 +52,6 @@ impl Ball {
         self.consecutive = 0;
     }
     
-    pub fn is_going_left(&self) -> bool {
-        self.vel.x < 0.0
-    }
-
     pub fn draw(&self, ctx: &mut Context) -> GameResult {
         let mesh = graphics::Mesh::new_circle(
             ctx,

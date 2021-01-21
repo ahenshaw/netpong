@@ -11,47 +11,101 @@ use crate::{SCREEN_WIDTH, SCREEN_HEIGHT, Position, Ball};
 
 
 pub struct Player {
+    me: PlayerType,
+    opponent: PlayerType,
     pos: Position,
     width: f32,
     height: f32,
     is_left: bool,
     last_ball: Option<Position>,
-    pub is_active: bool,
+    in_sock:   Option<UdpSocket>,
+    out_sock:  Option<UdpSocket>,
+    out_port:  u16,
     pub score: i32,
 }
+#[derive(PartialEq, Clone)]
+pub enum PlayerType {
+    Human(String),
+    Computer,
+    Network(Option<String>),
+}
+
+const PORT: u16 = 34521;
 
 impl Player {
-    pub fn new(is_left: bool) -> Self {
+    pub fn new(
+            is_left: bool, 
+            me: &PlayerType, 
+            opponent: &PlayerType) -> Self {
+        
         let padding = SCREEN_HEIGHT / 15.0;
         let x = if is_left {padding} else {SCREEN_WIDTH - padding};
 
+        let (in_port, out_port) = if is_left {(PORT, PORT+1)} else {(PORT + 1, PORT)};
+
+        let in_socket = match me {
+            PlayerType::Network(_) => {
+                let socket = UdpSocket::bind(format!("0.0.0.0:{}", in_port)).expect("Failed to bind socket");
+                socket.set_nonblocking(true).expect("Couldn't set inport to non-blocking");
+                Some(socket)
+            },
+            _ => None,
+        };
+        let out_socket = match opponent {
+            PlayerType::Network(_) => {
+                Some(UdpSocket::bind("0.0.0.0:0").expect("Failed to create socket"))
+            },
+            _ => None,
+        };
+
         Player{
+            me: me.clone(),
+            opponent: opponent.clone(),
             pos: Position{x, y: SCREEN_HEIGHT/30.0}, 
             width:  SCREEN_HEIGHT / 100.0,
             height: SCREEN_HEIGHT / 15.0,
             is_left, 
+            in_sock: in_socket,
+            out_sock: out_socket,
+            out_port,
             last_ball: None, 
-            is_active:false, 
             score: 0
         }
     }
 
     pub fn update(&mut self, ctx: &mut Context) {
-        if !self.is_left {
-            self.pos.y = mouse::position(ctx).y;
+        match self.me{
+            PlayerType::Human(_) => {
+                self.pos.y = mouse::position(ctx).y;
+                self.pos.y = self.pos.y.max(self.height/2.0).min(SCREEN_HEIGHT - self.height/2.0);
+            },
+            PlayerType::Network(_) => {
+                if let Some(socket) = &self.in_sock {
+                    let mut buf = [0u8; 1024];
+                    let result = socket.recv_from(&mut buf);
+                    match result {
+                        Ok((len, addr)) => {
+                            dbg!(len, addr);
+                        },
+                        _ => ()
+                    }
+                }
+            },
+            _ => ()
         }
 
-        self.pos.y = self.pos.y.max(self.height/2.0).min(SCREEN_HEIGHT - self.height/2.0);
-
-        if self.is_left {
-            // send network message with paddle position
-            let message = Update{UpdateType: OneOfUpdateType::paddle(Paddle{y:self.pos.y})};
-            let mut out = Vec::new();
-            let mut writer = Writer::new(&mut out);
-            writer.write_message(&message).expect("Cannot write message!");
-
-            let socket = UdpSocket::bind("127.0.0.1:0").expect("Can't open UDP connection!");
-            socket.send_to(&out, "127.0.0.1:34254").expect("Can't send to UDP socket");
+        match &self.opponent {
+            PlayerType::Network(Some(address)) => { 
+                // send network message with paddle position
+                let message = Update{UpdateType: OneOfUpdateType::paddle(Paddle{y:self.pos.y})};
+                let mut out = Vec::new();
+                let mut writer = Writer::new(&mut out);
+                writer.write_message(&message).expect("Cannot write message!");
+                if let Some(socket) = &self.out_sock {
+                    socket.send_to(&out, format!("{}:{}", address, self.out_port)).expect("Can't send to UDP socket");
+                }
+            },
+            _ => ()
         }
     }
 
@@ -88,7 +142,7 @@ impl Player {
     }
 
     pub fn check_for_hit(&mut self, ball: &mut Ball, ctx: &mut Context) { 
-        if self.is_left {
+        if self.me == PlayerType::Computer {
             self.pos.y = ball.pos.y;
         }
 
@@ -109,7 +163,7 @@ impl Player {
                 let frac = (edge - prev.x)/dx;
                 let y    = prev.y + dy * frac;
 
-                if self.is_left {
+                if self.me == PlayerType::Computer {
                     self.pos.y  = y; // demo mode
                 }
                 let top    = self.pos.y + self.height/2.0;
