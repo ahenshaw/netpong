@@ -18,15 +18,11 @@ pub enum PlayerMode {
 
 pub struct Player {
     me: PlayerType,
-    opponent: PlayerType,
     pos: Position,
     width: f32,
     height: f32,
     is_left: bool,
     last_ball: Option<Position>,
-    in_sock:   Option<UdpSocket>,
-    out_sock:  Option<UdpSocket>,
-    out_port:  u16,
     pub score: i32,
     t: f32,
     mode: PlayerMode,
@@ -42,40 +38,17 @@ pub enum PlayerType {
 const PORT: u16 = 34521;
 
 impl Player {
-    pub fn new(
-            is_left: bool, 
-            me: &PlayerType, 
-            opponent: &PlayerType) -> Self {
+    pub fn new(is_left: bool, me: &PlayerType) -> Self {
         
         let padding = SCREEN_HEIGHT / 15.0;
         let x = if is_left {padding} else {SCREEN_WIDTH - padding};
 
-        let (in_port, out_port) = if is_left {(PORT, PORT+1)} else {(PORT + 1, PORT)};
-        let in_socket = match me {
-            PlayerType::Network(_) => {
-                let socket = UdpSocket::bind(format!("0.0.0.0:{}", in_port)).expect("Failed to bind socket");
-                socket.set_nonblocking(true).expect("Couldn't set inport to non-blocking");
-                Some(socket)
-            },
-            _ => None,
-        };
-        let out_socket = match opponent {
-            PlayerType::Network(_) => {
-                Some(UdpSocket::bind("0.0.0.0:0").expect("Failed to create socket"))
-            },
-            _ => None,
-        };
-
         Player{
             me: me.clone(),
-            opponent: opponent.clone(),
             pos: Position{x, y: SCREEN_HEIGHT/30.0}, 
             width:  SCREEN_HEIGHT / 100.0,
             height: SCREEN_HEIGHT / 15.0,
             is_left, 
-            in_sock: in_socket,
-            out_sock: out_socket,
-            out_port,
             last_ball: None, 
             score: 0,
             t: 0.0,
@@ -93,40 +66,29 @@ impl Player {
         match self.me{
             PlayerType::Human(_) => {
                 if self.is_left {
-                    self.pos.y = mouse::position(ctx).y;
+                    //self.pos.y = mouse::position(ctx).y;
+                    self.pos.y += extra;
                 } else { 
                     self.pos.y += extra;
                 }
                 self.pos.y = self.pos.y.max(self.height/2.0).min(SCREEN_HEIGHT - self.height/2.0);
             },
-            PlayerType::Network(_) => {
-                if let Some(socket) = &self.in_sock {
-                    let mut buf = [0u8; 1024];
-                    let result = socket.recv_from(&mut buf);
-                    match result {
-                        Ok((len, addr)) => {
-                            dbg!(len, addr);
-                        },
-                        _ => ()
-                    }
-                }
-            },
             _ => ()
         }
 
-        match &self.opponent {
-            PlayerType::Network(Some(address)) => { 
-                // send network message with paddle position
-                let message = Update{UpdateType: OneOfUpdateType::paddle(Paddle{y:self.pos.y})};
-                let mut out = Vec::new();
-                let mut writer = Writer::new(&mut out);
-                writer.write_message(&message).expect("Cannot write message!");
-                if let Some(socket) = &self.out_sock {
-                    socket.send_to(&out, format!("{}:{}", address, self.out_port)).expect("Can't send to UDP socket");
-                }
-            },
-            _ => ()
-        }
+        // match &self.opponent {
+        //     PlayerType::Network(Some(address)) => { 
+        //         // send network message with paddle position
+        //         let message = Update{UpdateType: OneOfUpdateType::paddle(Paddle{y:self.pos.y})};
+        //         let mut out = Vec::new();
+        //         let mut writer = Writer::new(&mut out);
+        //         writer.write_message(&message).expect("Cannot write message!");
+        //         if let Some(socket) = &self.out_sock {
+        //             socket.send_to(&out, format!("{}:{}", address, self.out_port)).expect("Can't send to UDP socket");
+        //         }
+        //     },
+        //     _ => ()
+        // }
     }
 
     pub fn draw(&self, ctx: &mut Context) -> GameResult {
@@ -281,7 +243,11 @@ impl Player {
         let body_segment = graphics::Mesh::new_rectangle(ctx, graphics::DrawMode::fill(),  
             graphics::Rect::new(0.0, 0.0, w, h), graphics::Color::from_rgb(255, 198, 41))?;
         
-        let body_rotations = vec![-f32::PI()/2.0, 0.0, 0.4, 0.8];
+        let body_rotations = if self.is_left {
+            vec![-f32::PI()/2.0, 0.0, -0.4, -0.8]
+        } else {
+            vec![-f32::PI()/2.0, 0.0, 0.4, 0.8]
+        };
 
         let mut x = x;
         let mut y = y;
@@ -299,5 +265,4 @@ impl Player {
         }        
         Ok(())
     }
-
 }

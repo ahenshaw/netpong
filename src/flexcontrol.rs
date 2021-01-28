@@ -3,7 +3,6 @@ use std::time::Duration;
 use std::str;
 use serialport::SerialPort;
 
-static PORT: &str = "COM8";
 const BAUD_RATE: u32 = 115_200; 
 
 pub struct FlexControl {
@@ -11,8 +10,8 @@ pub struct FlexControl {
 }
 
 impl FlexControl {
-    pub fn new() -> FlexControl {
-        let flex = serialport::new(PORT, BAUD_RATE)
+    pub fn new(port: &str) -> FlexControl {
+        let flex = serialport::new(port, BAUD_RATE)
             .timeout(Duration::from_millis(10))
             .open()
             .expect("Couldn't open flex control");

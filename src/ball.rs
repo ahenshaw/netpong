@@ -23,6 +23,7 @@ pub struct Ball {
     table: audio::Source,
     consecutive: i32,
     is_game_over: bool,
+    delay: f32,
 }
 
 impl Ball {
@@ -35,6 +36,7 @@ impl Ball {
                             table: audio::Source::new(ctx, "/table.wav").expect("Could load table sound file"),
                             consecutive: 0,
                             is_game_over: false,
+                            delay: 0.0,
                         };
         ball.init();
         ball
@@ -53,6 +55,7 @@ impl Ball {
             false => -BALL_SPEED,
         };
         self.consecutive = 0;
+        self.delay = 0.5;
     }
     
     pub fn game_over(&mut self) {
@@ -80,6 +83,10 @@ impl Ball {
 
 
     pub fn update(&mut self, dt: f32, ctx: &mut Context) -> (i32, i32) {
+        if self.delay > 0.0 {
+            self.delay -= dt;
+            return (0, 0);
+        }
         if self.is_game_over {
             self.pos.y = SCREEN_HEIGHT/2.0;
             self.pos.x = -self.radius;

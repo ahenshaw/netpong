@@ -36,7 +36,8 @@ struct MainState {
     p2:   Player,
     ball: Ball,
     mode: GameMode,
-    controller: FlexControl,
+    left_controller:  FlexControl,
+    right_controller: FlexControl,
 }
 
 
@@ -52,7 +53,7 @@ fn to_player_type(s: &str) -> PlayerType {
     match s {
             "network"   => PlayerType::Network(None),
             "computer"  => PlayerType::Computer,
-            "me"        => PlayerType::Human("player".to_string()),
+            "man"       => PlayerType::Human("player".to_string()),
             _           => PlayerType::Network(Some(s.to_string())),
         }
 }
@@ -77,11 +78,12 @@ impl MainState {
             _ => GameMode::Paused,
         };
         MainState {
-            p1: Player::new(true,  &left, &right),
-            p2: Player::new(false, &right, &left),
+            p1: Player::new(true,  &left),
+            p2: Player::new(false, &right),
             ball: Ball::new(ctx),
             mode,
-            controller: FlexControl::new(),
+            left_controller: FlexControl::new("COM8"),
+            right_controller: FlexControl::new("COM9"),
         }
     }
 }
@@ -124,13 +126,17 @@ impl event::EventHandler for MainState {
         };
 
         if dt < 0.1 {
-            let motion = {
-                let x = self.controller.read();
+            let left_motion = {
+                let x = self.left_controller.read();
+                (3 * x.signum() * x * x) as f32
+            };
+            let right_motion = {
+                let x = self.right_controller.read();
                 (3 * x.signum() * x * x) as f32
             };
     
-            self.p1.update(ctx, dt, 0.0);
-            self.p2.update(ctx, dt, motion);
+            self.p1.update(ctx, dt, left_motion);
+            self.p2.update(ctx, dt, right_motion);
 
             let (s1, s2) = self.ball.update(dt, ctx);
 
@@ -204,7 +210,7 @@ struct Opt {
     debug: bool,
     #[structopt(short, long, default_value = "360")]
     speed: f64,
-    #[structopt(default_value = "me")]
+    #[structopt(default_value = "man")]
     left: String,
     #[structopt(default_value = "computer")]
     right: String,
