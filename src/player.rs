@@ -8,7 +8,13 @@ use crate::netpong::mod_Update::{OneOfUpdateType};
 use crate::netpong::{Update, Paddle};
 
 use crate::{SCREEN_WIDTH, SCREEN_HEIGHT, Position, Ball};
+use num_traits::float::FloatConst;
 
+pub enum PlayerMode {
+    Active,
+    Winner,
+    Loser,
+}
 
 pub struct Player {
     me: PlayerType,
@@ -22,7 +28,10 @@ pub struct Player {
     out_sock:  Option<UdpSocket>,
     out_port:  u16,
     pub score: i32,
+    t: f32,
+    mode: PlayerMode,
 }
+
 #[derive(PartialEq, Clone)]
 pub enum PlayerType {
     Human(String),
@@ -42,7 +51,6 @@ impl Player {
         let x = if is_left {padding} else {SCREEN_WIDTH - padding};
 
         let (in_port, out_port) = if is_left {(PORT, PORT+1)} else {(PORT + 1, PORT)};
-
         let in_socket = match me {
             PlayerType::Network(_) => {
                 let socket = UdpSocket::bind(format!("0.0.0.0:{}", in_port)).expect("Failed to bind socket");
@@ -69,14 +77,26 @@ impl Player {
             out_sock: out_socket,
             out_port,
             last_ball: None, 
-            score: 0
+            score: 0,
+            t: 0.0,
+            mode: PlayerMode::Active,
         }
     }
 
-    pub fn update(&mut self, ctx: &mut Context) {
+    pub fn update_score(&mut self, increment: i32) -> i32 {
+        self.score += increment;
+        self.score
+    }
+
+    pub fn update(&mut self, ctx: &mut Context, dt: f32, extra: f32) {
+        self.t += dt;
         match self.me{
             PlayerType::Human(_) => {
-                self.pos.y = mouse::position(ctx).y;
+                if self.is_left {
+                    self.pos.y = mouse::position(ctx).y;
+                } else { 
+                    self.pos.y += extra;
+                }
                 self.pos.y = self.pos.y.max(self.height/2.0).min(SCREEN_HEIGHT - self.height/2.0);
             },
             PlayerType::Network(_) => {
@@ -119,9 +139,17 @@ impl Player {
                 self.width, 
                 self.height), 
             graphics::Color::from_rgb(255, 198, 41))?;
-        graphics::draw(ctx, &mesh, graphics::DrawParam::default())?;
-        
+
+        match self.mode {
+            PlayerMode::Active => graphics::draw(ctx, &mesh, graphics::DrawParam::default())?,
+            PlayerMode::Loser  => self.draw_sad(ctx, self.pos.x, self.pos.y+self.height/2.0, self.t)?,
+            PlayerMode::Winner => self.draw_wacky(ctx, self.pos.x, self.pos.y+self.height/2.0, self.t)?,
+        }
         Ok(())
+    }
+
+    pub fn set_mode(&mut self, mode: PlayerMode) {
+        self.mode = mode;
     }
     
     pub fn draw_score(&self, ctx: &mut Context) -> GameResult {
@@ -179,4 +207,97 @@ impl Player {
         }
         self.last_ball = Some(ball.pos);
     }
+
+    fn draw_wacky(&self, ctx: &mut Context, x: f32, y: f32, t:f32) -> GameResult {
+        let h = SCREEN_HEIGHT / 100.0;
+        let w = SCREEN_HEIGHT / 60.0;
+        let body_segment = graphics::Mesh::new_rectangle(ctx, graphics::DrawMode::fill(),  
+            graphics::Rect::new(0.0, 0.0, w, h), graphics::Color::from_rgb(255, 198, 41))?;
+        let arm_segment = graphics::Mesh::new_rectangle(ctx, graphics::DrawMode::fill(),  
+            graphics::Rect::new(0.0, 0.0, w/2.0, h/2.0), graphics::Color::from_rgb(255, 198, 41))?;
+        
+        let body_rotations = vec![-f32::PI()/2.0, 
+                (3.0*t).sin()/2.0, (5.0*t).cos()/2.0, (7.0*t).sin()/5.0];
+        let left_rotations = vec![-f32::PI()*0.8, 
+                (5.0*t).sin()/2.0, (7.0*t).cos()/2.0, (11.0*t).sin()/2.0];
+        let right_rotations = vec![-f32::PI()*0.2, 
+                (5.0*t).cos()/2.0, (7.0*t).sin()/2.0, (11.0*t).cos()/2.0];
+
+        let mut x = x;
+        let mut y = y;
+        let mut phi = 0.0;
+        for (i, theta) in body_rotations.iter().enumerate() {
+            phi += theta;
+            graphics::draw(ctx, &body_segment, 
+                graphics::DrawParam::default()
+                .dest([x, y])
+                .rotation(phi)
+                .offset([0.0, h/2.0])
+            )?;
+            x += phi.cos() * w;
+            y += phi.sin() * w;
+            if i == 2 {
+                { // draw left arm
+                    // move arm joint to partially down the torso from the neck
+                    let mut x = x - phi.cos() * (w * 0.4); 
+                    let mut y = y - phi.sin() * (w * 0.4); 
+                    let mut phi = 0.0;
+                    for theta in &left_rotations {
+                        phi += theta;
+                        graphics::draw(ctx, &arm_segment, 
+                            graphics::DrawParam::default()
+                            .dest([x, y])
+                            .rotation(phi)
+                            .offset([0.0, h/4.0])
+                        )?;
+                        x += phi.cos() * w/2.0;
+                        y += phi.sin() * w/2.0;
+                    }
+                }   
+                { // draw right arm
+                    let mut x = x - phi.cos() * (w * 0.4); 
+                    let mut y = y - phi.sin() * (w * 0.4); 
+                    let mut phi = 0.0;
+                    for theta in &right_rotations {
+                        phi += theta;
+                        graphics::draw(ctx, &arm_segment, 
+                            graphics::DrawParam::default()
+                            .dest([x, y])
+                            .rotation(phi)
+                            .offset([0.0, h/4.0])
+                        )?;
+                        x += phi.cos() * w/2.0;
+                        y += phi.sin() * w/2.0;
+                    }
+                }   
+            }
+        }        
+        Ok(())
+    }
+    
+    fn draw_sad(&self, ctx: &mut Context, x: f32, y: f32, _t:f32) -> GameResult {
+        let h = SCREEN_HEIGHT / 100.0;
+        let w = SCREEN_HEIGHT / 60.0;
+        let body_segment = graphics::Mesh::new_rectangle(ctx, graphics::DrawMode::fill(),  
+            graphics::Rect::new(0.0, 0.0, w, h), graphics::Color::from_rgb(255, 198, 41))?;
+        
+        let body_rotations = vec![-f32::PI()/2.0, 0.0, 0.4, 0.8];
+
+        let mut x = x;
+        let mut y = y;
+        let mut phi = 0.0;
+        for (i, theta) in body_rotations.iter().enumerate() {
+            phi += theta;
+            graphics::draw(ctx, &body_segment, 
+                graphics::DrawParam::default()
+                .dest([x, y])
+                .rotation(phi)
+                .offset([0.0, h/2.0])
+            )?;
+            x += phi.cos() * w;
+            y += phi.sin() * w;
+        }        
+        Ok(())
+    }
+
 }

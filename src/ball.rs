@@ -22,6 +22,7 @@ pub struct Ball {
     pong:  audio::Source,
     table: audio::Source,
     consecutive: i32,
+    is_game_over: bool,
 }
 
 impl Ball {
@@ -32,7 +33,9 @@ impl Ball {
                             ping:  audio::Source::new(ctx, "/ping.wav").expect("Could load pong sound file"),
                             pong:  audio::Source::new(ctx, "/pong.wav").expect("Could load pong sound file"),
                             table: audio::Source::new(ctx, "/table.wav").expect("Could load table sound file"),
-                            consecutive: 0,};
+                            consecutive: 0,
+                            is_game_over: false,
+                        };
         ball.init();
         ball
     }
@@ -52,6 +55,10 @@ impl Ball {
         self.consecutive = 0;
     }
     
+    pub fn game_over(&mut self) {
+        self.is_game_over = true;
+    }
+
     pub fn draw(&self, ctx: &mut Context) -> GameResult {
         let mesh = graphics::Mesh::new_circle(
             ctx,
@@ -73,6 +80,11 @@ impl Ball {
 
 
     pub fn update(&mut self, dt: f32, ctx: &mut Context) -> (i32, i32) {
+        if self.is_game_over {
+            self.pos.y = SCREEN_HEIGHT/2.0;
+            self.pos.x = -self.radius;
+            return (0, 0)
+        }
         let s = dt * 1.1f32.powi(self.consecutive/2);
         self.pos.x += self.vel.x * s; 
         self.pos.y += self.vel.y * s; 

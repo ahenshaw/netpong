@@ -12,7 +12,6 @@ rand = "0.7.3"
 quick-protobuf = "0.8.0"
 ggez = {git = "https://github.com/ggez/ggez.git", branch = "devel"}
 structopt = "0.3.21"
-
-
-[profile.release]
-opt-level = 'z'  # Optimize for size
+serialport = "4.0.0"
+k = "0.21.3"
+num-traits = "0.2.14"
