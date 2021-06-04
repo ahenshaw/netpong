@@ -2,11 +2,13 @@ mod ball;
 mod player;
 mod flexcontrol;
 mod netpong;
+mod wacky_tube_man;
 
 // custom modules
 use ball::Ball;
 use player::{Player, PlayerType, PlayerMode};
 use flexcontrol::FlexControl;
+use wacky_tube_man::WackyTubeMan;
 
 use std::time::Duration;
 use structopt::StructOpt;
@@ -29,15 +31,16 @@ type Velocity = na::Vector2<f32>;
 const SCREEN_WIDTH:  f32 = 800.0;
 const SCREEN_HEIGHT: f32 = 600.0;
 
-const WINNING_SCORE:i32 = 15;
+const WINNING_SCORE:i32 = 3;
 
 struct MainState {
     p1:   Player,
     p2:   Player,
     ball: Ball,
     mode: GameMode,
-    left_controller:  FlexControl,
-    right_controller: FlexControl,
+    // left_controller:  FlexControl,
+    // right_controller: FlexControl,
+    wacky: WackyTubeMan,
 }
 
 
@@ -62,7 +65,10 @@ fn message(ctx: &mut Context, s: &str) -> GameResult {
     let text = graphics::Text::new(s);
     let r = text.dimensions(ctx);
 
-    graphics::draw(ctx, &text, graphics::DrawParam::default().dest([(SCREEN_WIDTH - r.w)/2.0, (SCREEN_HEIGHT - r.h)/2.0]))?;
+    graphics::draw(ctx, 
+        &text, 
+        graphics::DrawParam::default().dest([(SCREEN_WIDTH - r.w)/2.0, (SCREEN_HEIGHT - r.h)/2.0])
+    )?;
     // graphics::present(ctx)?;
     Ok(())
 }
@@ -77,13 +83,17 @@ impl MainState {
             (_, PlayerType::Network(None)) => GameMode::WaitingForNetwork,
             _ => GameMode::Paused,
         };
+        let mut wacky = WackyTubeMan::new(40.0, 6.0, graphics::Color::from_rgb(255, 198, 41));
+        wacky.set_position(200.0, 200.0);
+
         MainState {
             p1: Player::new(true,  &left),
             p2: Player::new(false, &right),
             ball: Ball::new(ctx),
             mode,
-            left_controller: FlexControl::new("COM8"),
-            right_controller: FlexControl::new("COM9"),
+            // left_controller: FlexControl::new("COM8"),
+            // right_controller: FlexControl::new("COM9"),
+            wacky,
         }
     }
 }
@@ -111,7 +121,7 @@ impl event::EventHandler for MainState {
 
         let dt = ggez::timer::delta(ctx).as_secs_f32();
         ggez::timer::sleep(Duration::from_secs_f32((0.016666 - dt).max(0.0)));
-
+        self.wacky.update(dt);
         match self.mode {
             GameMode::Paused => {return Ok(())},
             GameMode::GameOver => {
@@ -127,12 +137,14 @@ impl event::EventHandler for MainState {
 
         if dt < 0.1 {
             let left_motion = {
-                let x = self.left_controller.read();
-                (3 * x.signum() * x * x) as f32
+                0.0
+                // let x = self.left_controller.read();
+                // (3 * x.signum() * x * x) as f32
             };
             let right_motion = {
-                let x = self.right_controller.read();
-                (3 * x.signum() * x * x) as f32
+                0.0
+                // let x = self.right_controller.read();
+                // (3 * x.signum() * x * x) as f32
             };
     
             self.p1.update(ctx, dt, left_motion);
@@ -165,7 +177,8 @@ impl event::EventHandler for MainState {
 
         match self.mode {
             GameMode::Paused => {
-                message(ctx, "Game paused. Hit [space] to continue.\n[Esc] to quit.")?;
+                self.wacky.draw(ctx, false)?;
+                // message(ctx, "Game paused. Hit [space] to continue.\n[Esc] to quit.")?;
                 graphics::present(ctx)?;
                 return Ok(())
             },
